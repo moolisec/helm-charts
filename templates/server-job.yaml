@@ -37,74 +37,13 @@ spec:
         app.kubernetes.io/part-of: {{ .Chart.Name }}
     spec:
       restartPolicy: "OnFailure"
-      initContainers:
-        {{- if .Values.cassandra.enabled }}
-        - name: check-cassandra-service
-          image: busybox
-          command: ['sh', '-c', 'until nslookup {{ include "cassandra.host" $ }}; do echo waiting for cassandra service; sleep 1; done;']
-        - name: check-cassandra
-          image: "{{ .Values.cassandra.image.repo }}:{{ .Values.cassandra.image.tag }}"
-          imagePullPolicy: {{ .Values.cassandra.image.pullPolicy }}
-          command: ['sh', '-c', 'until cqlsh {{ include "cassandra.host" $ }} {{ .Values.cassandra.config.ports.cql }} -e "SHOW VERSION"; do echo waiting for cassandra to start; sleep 1; done;']
-        {{- end }}
-        {{- range $store := (list "default" "visibility") }}
-        {{- $storeConfig := index $.Values.server.config.persistence $store }}
-        - name: create-{{ $store }}-store
-          image: "{{ $.Values.admintools.image.repository }}:{{ $.Values.admintools.image.tag }}"
-          imagePullPolicy: {{ $.Values.admintools.image.pullPolicy }}
-          {{- if eq (include "temporal.persistence.driver" (list $ $store)) "cassandra" }}
-          command: ['sh', '-c', 'temporal-cassandra-tool create -k {{ $storeConfig.cassandra.keyspace }} --replication-factor {{ $storeConfig.cassandra.replicationFactor }}']
-          {{- end }}
-          {{- if eq (include "temporal.persistence.driver" (list $ $store)) "sql" }}
-          command: ['sh', '-c', 'temporal-sql-tool create-database -database {{ $storeConfig.sql.database }}']
-          {{- end }}
-          env:
-            {{- if eq (include "temporal.persistence.driver" (list $ $store)) "cassandra" }}
-            - name: CASSANDRA_HOST
-              value: {{ first (splitList "," (include "temporal.persistence.cassandra.hosts" (list $ $store))) }}
-            - name: CASSANDRA_PORT
-              value: {{ include "temporal.persistence.cassandra.port" (list $ $store) | quote }}
-            - name: CASSANDRA_KEYSPACE
-              value: {{ $storeConfig.cassandra.keyspace }}
-            {{- if $storeConfig.cassandra.user }}
-            - name: CASSANDRA_USER
-              value: {{ $storeConfig.cassandra.user }}
-            {{- end }}
-            {{- if $storeConfig.cassandra.password }}
-            - name: CASSANDRA_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "temporal.persistence.secretName" (list $ $store) }}
-                  key: {{ include "temporal.persistence.secretKey" (list $ $store) }}
-            {{- end }}
-            {{- end }}
-            {{- if eq (include "temporal.persistence.driver" (list $ $store)) "sql" }}
-            - name: SQL_HOST
-              value: {{ include "temporal.persistence.sql.host" (list $ $store) }}
-            - name: SQL_PORT
-              value: {{ include "temporal.persistence.sql.port" (list $ $store) | quote }}
-            - name: SQL_PLUGIN
-              value: {{ $storeConfig.sql.driver }}
-            {{- if $storeConfig.sql.user }}
-            - name: SQL_USER
-              value: {{ $storeConfig.sql.user }}
-            {{- end }}
-            {{- if $storeConfig.sql.password }}
-            - name: SQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "temporal.persistence.secretName" (list $ $store) }}
-                  key: {{ include "temporal.persistence.secretKey" (list $ $store) }}
-            {{- end }}
-            {{- end }}
-        {{- end }}
       containers:
         {{- range $store := (list "default" "visibility") }}
         {{- $storeConfig := index $.Values.server.config.persistence $store }}
         - name: {{ $store }}-schema
           image: "{{ $.Values.admintools.image.repository }}:{{ $.Values.admintools.image.tag }}"
           imagePullPolicy: {{ $.Values.admintools.image.pullPolicy }}
-          command: ["temporal-{{ include "temporal.persistence.driver" (list $ $store) }}-tool", "setup-schema", "-v", "0.0"]
+          command: ["temporal-{{ include "temporal.persistence.driver" (list $ $store) }}-tool", "setup-schema", "-v", "0.0", "-q"]
           env:
             {{- if eq (include "temporal.persistence.driver" (list $ $store)) "cassandra" }}
             - name: CASSANDRA_HOST
