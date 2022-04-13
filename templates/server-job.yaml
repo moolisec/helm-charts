@@ -209,7 +209,7 @@ spec:
               {{- else }}
               value: {{ $storeConfig.cassandra.password }}
               {{- end }}
-              {{- end }}
+            {{- end }}
             {{- end }}
             {{- if eq (include "temporal.persistence.driver" (list $ $store)) "sql" }}
             - name: SQL_HOST
@@ -232,6 +232,7 @@ spec:
               {{- else }}
               value: {{ $storeConfig.sql.password }}
               {{- end }}
+            {{- end }}
             {{- if eq $store "default" }}
             - name: SQL_DATABASE
               value: temporal
